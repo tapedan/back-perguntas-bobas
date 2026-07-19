@@ -131,7 +131,21 @@ class Room {
       revealed: this.currentRound.revealed,
     };
   }
+
+  // Zera a sala por completo: remove jogadores, placar e a partida em andamento.
+  // Usado pelo botão global de reset do servidor.
+  reset() {
+    this.players = new Map();
+    this.order = [];
+    this.roundIndex = -1;
+    this.status = 'lobby';
+    this.usedQuestionIds = new Set();
+    this.currentRound = null;
+  }
 }
+
+// Sala global única do servidor — todo mundo que entra no app cai nela.
+const GLOBAL_ROOM_CODE = 'GLOBAL';
 
 function getOrCreateRoom(code) {
   if (!rooms.has(code)) rooms.set(code, new Room(code));
@@ -159,4 +173,5 @@ module.exports = {
   getRoom,
   generateRoomCode,
   questionById,
+  GLOBAL_ROOM_CODE,
 };
