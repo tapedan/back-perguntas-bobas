@@ -6,8 +6,8 @@ const {
   CATEGORIES,
   getOrCreateRoom,
   getRoom,
-  generateRoomCode,
   questionById,
+  GLOBAL_ROOM_CODE,
 } = require('./gameLogic');
 
 const app = express();
@@ -28,80 +28,73 @@ const io = new Server(server, {
 const MIN_PLAYERS = 3;
 const MAX_PLAYERS = 12;
 
-function scoreboard(room) {
-  return [...room.players.values()]
+// Sala única e global: não existe mais código de sala pra criar/entrar.
+// Todo mundo que abre o app cai automaticamente nesta mesma sala.
+const room = getOrCreateRoom(GLOBAL_ROOM_CODE);
+
+function scoreboard(r) {
+  return [...r.players.values()]
     .map((p) => ({ id: p.id, name: p.name, score: p.score, connected: p.connected }))
     .sort((a, b) => b.score - a.score);
 }
 
-function roomSummary(room) {
+function roomSummary(r) {
   return {
-    code: room.code,
-    status: room.status,
-    players: room.playerList(),
+    status: r.status,
+    players: r.playerList(),
   };
 }
 
-function sendRoundToEveryone(room) {
-  const round = room.currentRound;
-  const guesser = room.players.get(round.guesserId);
-  io.to(room.code).emit('round_started', {
+function sendRoundToEveryone(r) {
+  const round = r.currentRound;
+  const guesser = r.players.get(round.guesserId);
+  io.to(GLOBAL_ROOM_CODE).emit('round_started', {
     guesserId: round.guesserId,
     guesserName: guesser ? guesser.name : '???',
-    roundNumber: room.roundIndex + 1,
-    totalRounds: room.totalRounds(),
+    roundNumber: r.roundIndex + 1,
+    totalRounds: r.totalRounds(),
   });
 }
 
 io.on('connection', (socket) => {
-  socket.on('create_room', ({ name, playerId }, cb) => {
+  // Entra na sala global. Se o jogador já existia (ex: reload de página), só
+  // reconecta o socket dele em vez de duplicar.
+  socket.on('enter_lobby', ({ name, playerId }, cb) => {
     try {
-      const code = generateRoomCode();
-      const room = getOrCreateRoom(code);
-      room.addPlayer(playerId, (name || 'Jogador').slice(0, 20), socket.id);
-      socket.join(code);
-      socket.data.roomCode = code;
+      if (room.players.has(playerId)) {
+        const player = room.players.get(playerId);
+        player.connected = true;
+        player.socketId = socket.id;
+        player.name = (name || player.name).slice(0, 20);
+      } else {
+        if (room.status !== 'lobby') {
+          return cb({
+            ok: false,
+            error: 'Uma partida já está em andamento. Espere terminar ou peça pra alguém resetar o servidor.',
+          });
+        }
+        if (room.players.size >= MAX_PLAYERS) {
+          return cb({ ok: false, error: `Sala cheia (máximo de ${MAX_PLAYERS} jogadores).` });
+        }
+        room.addPlayer(playerId, (name || 'Jogador').slice(0, 20), socket.id);
+      }
+      socket.join(GLOBAL_ROOM_CODE);
       socket.data.playerId = playerId;
-      cb({ ok: true, code, playerId });
-      io.to(code).emit('room_update', roomSummary(room));
+      cb({ ok: true, status: room.status });
+      io.to(GLOBAL_ROOM_CODE).emit('room_update', roomSummary(room));
     } catch (err) {
       cb({ ok: false, error: err.message });
     }
   });
 
-  socket.on('join_room', ({ code, name, playerId }, cb) => {
-    try {
-      const roomCode = (code || '').toUpperCase().trim();
-      const room = getRoom(roomCode);
-      if (!room) return cb({ ok: false, error: 'Sala não encontrada. Confira o código.' });
-      if (room.status !== 'lobby') {
-        return cb({ ok: false, error: 'Essa partida já começou. Peça um novo código.' });
-      }
-      if (room.players.size >= MAX_PLAYERS) {
-        return cb({ ok: false, error: 'Sala cheia.' });
-      }
-      room.addPlayer(playerId, (name || 'Jogador').slice(0, 20), socket.id);
-      socket.join(roomCode);
-      socket.data.roomCode = roomCode;
-      socket.data.playerId = playerId;
-      cb({ ok: true, code: roomCode, playerId });
-      io.to(roomCode).emit('room_update', roomSummary(room));
-    } catch (err) {
-      cb({ ok: false, error: err.message });
-    }
-  });
-
-  socket.on('rejoin_room', ({ code, playerId }, cb) => {
-    const roomCode = (code || '').toUpperCase().trim();
-    const room = getRoom(roomCode);
-    if (!room || !room.players.has(playerId)) {
+  socket.on('rejoin_room', ({ playerId }, cb) => {
+    if (!room.players.has(playerId)) {
       return cb({ ok: false });
     }
     const player = room.players.get(playerId);
     player.connected = true;
     player.socketId = socket.id;
-    socket.join(roomCode);
-    socket.data.roomCode = roomCode;
+    socket.join(GLOBAL_ROOM_CODE);
     socket.data.playerId = playerId;
 
     const payload = { ok: true, room: roomSummary(room), status: room.status };
@@ -127,24 +120,30 @@ io.on('connection', (socket) => {
       payload.finalScoreboard = scoreboard(room);
     }
     cb(payload);
-    io.to(roomCode).emit('room_update', roomSummary(room));
+    io.to(GLOBAL_ROOM_CODE).emit('room_update', roomSummary(room));
   });
 
-  socket.on('start_game', ({ code }, cb) => {
-    const room = getRoom(code);
-    if (!room) return cb && cb({ ok: false, error: 'Sala não encontrada.' });
+  // Botão global de reset: qualquer jogador pode zerar a sala (remove todo
+  // mundo, apaga a partida atual e libera espaço pra uma nova).
+  socket.on('reset_server', (_payload, cb) => {
+    room.reset();
+    io.to(GLOBAL_ROOM_CODE).emit('server_reset');
+    io.to(GLOBAL_ROOM_CODE).emit('room_update', roomSummary(room));
+    cb && cb({ ok: true });
+  });
+
+  socket.on('start_game', (_payload, cb) => {
     if (room.players.size < MIN_PLAYERS) {
       return cb && cb({ ok: false, error: `Mínimo de ${MIN_PLAYERS} jogadores para começar.` });
     }
     room.startGame();
-    io.to(code).emit('game_started', { totalRounds: room.totalRounds() });
+    io.to(GLOBAL_ROOM_CODE).emit('game_started', { totalRounds: room.totalRounds() });
     sendRoundToEveryone(room);
     cb && cb({ ok: true });
   });
 
-  socket.on('choose_category', ({ code, category }, cb) => {
-    const room = getRoom(code);
-    if (!room || !room.currentRound) return cb && cb({ ok: false, error: 'Rodada inválida.' });
+  socket.on('choose_category', ({ category }, cb) => {
+    if (!room.currentRound) return cb && cb({ ok: false, error: 'Rodada inválida.' });
     if (socket.data.playerId !== room.currentRound.guesserId) {
       return cb && cb({ ok: false, error: 'Só o palpiteiro escolhe a categoria.' });
     }
@@ -156,7 +155,7 @@ io.on('connection', (socket) => {
     } catch (err) {
       return cb && cb({ ok: false, error: err.message });
     }
-    io.to(code).emit('category_chosen', { category });
+    io.to(GLOBAL_ROOM_CODE).emit('category_chosen', { category });
 
     const guesser = room.players.get(room.currentRound.guesserId);
     if (guesser && guesser.socketId) {
@@ -174,9 +173,8 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true });
   });
 
-  socket.on('submit_arrangement', ({ code, arrangement }, cb) => {
-    const room = getRoom(code);
-    if (!room || !room.currentRound) return cb && cb({ ok: false, error: 'Rodada inválida.' });
+  socket.on('submit_arrangement', ({ arrangement }, cb) => {
+    if (!room.currentRound) return cb && cb({ ok: false, error: 'Rodada inválida.' });
     if (socket.data.playerId !== room.currentRound.guesserId) {
       return cb && cb({ ok: false, error: 'Só o palpiteiro pode enviar a resposta.' });
     }
@@ -188,17 +186,15 @@ io.on('connection', (socket) => {
     } catch (err) {
       return cb && cb({ ok: false, error: err.message });
     }
-    io.to(code).emit('round_result', buildRoundResultPayload(room));
+    io.to(GLOBAL_ROOM_CODE).emit('round_result', buildRoundResultPayload(room));
     cb && cb({ ok: true });
   });
 
-  socket.on('next_round', ({ code }, cb) => {
-    const room = getRoom(code);
-    if (!room) return cb && cb({ ok: false });
+  socket.on('next_round', (_payload, cb) => {
     if (room.status !== 'round_result') return cb && cb({ ok: false });
     room.advanceRound();
     if (room.status === 'finished') {
-      io.to(code).emit('game_over', { players: scoreboard(room) });
+      io.to(GLOBAL_ROOM_CODE).emit('game_over', { players: scoreboard(room) });
     } else {
       sendRoundToEveryone(room);
     }
@@ -206,25 +202,23 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    const { roomCode, playerId } = socket.data;
-    if (!roomCode) return;
-    const room = getRoom(roomCode);
-    if (!room) return;
+    const { playerId } = socket.data;
+    if (!playerId) return;
     const player = room.players.get(playerId);
     if (player) {
       player.connected = false;
-      io.to(roomCode).emit('room_update', roomSummary(room));
+      io.to(GLOBAL_ROOM_CODE).emit('room_update', roomSummary(room));
     }
   });
 });
 
-function buildRoundResultPayload(room) {
-  const round = room.currentRound;
-  const guesser = room.players.get(round.guesserId);
-  const isLastRound = room.roundIndex + 1 >= room.totalRounds();
+function buildRoundResultPayload(r) {
+  const round = r.currentRound;
+  const guesser = r.players.get(round.guesserId);
+  const isLastRound = r.roundIndex + 1 >= r.totalRounds();
   let nextGuesserName = null;
   if (!isLastRound) {
-    const nextGuesser = room.players.get(room.order[room.roundIndex + 1]);
+    const nextGuesser = r.players.get(r.order[r.roundIndex + 1]);
     nextGuesserName = nextGuesser ? nextGuesser.name : null;
   }
   return {
@@ -236,9 +230,9 @@ function buildRoundResultPayload(room) {
     guesserId: round.guesserId,
     guesserName: guesser ? guesser.name : '???',
     pointsEarned: round.pointsEarned,
-    players: scoreboard(room),
-    roundNumber: room.roundIndex + 1,
-    totalRounds: room.totalRounds(),
+    players: scoreboard(r),
+    roundNumber: r.roundIndex + 1,
+    totalRounds: r.totalRounds(),
     isLastRound,
     nextGuesserName,
   };
@@ -247,5 +241,6 @@ function buildRoundResultPayload(room) {
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`Sala global: ${GLOBAL_ROOM_CODE}`);
   console.log(`Categorias carregadas: ${CATEGORIES.join(', ')}`);
 });
