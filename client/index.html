@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<meta name="theme-color" content="#0e0b16" />
+<title>Pergunta Boba</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- fundo animado orgânico -->
+  <div class="bg-blobs" aria-hidden="true">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+
+  <!-- barra superior fixa -->
+  <header class="topbar">
+    <button id="btn-settings" class="icon-btn" aria-label="Configurações">⚙️</button>
+    <div class="topbar-center" id="round-indicator" hidden>
+      <span id="round-current">1</span><span class="round-sep">/</span><span id="round-total">1</span>
+    </div>
+    <button id="btn-reset" class="icon-btn" aria-label="Reiniciar sala">⟲</button>
+  </header>
+
+  <main id="app">
+
+    <!-- TELA: entrar -->
+    <section class="screen" id="screen-join" data-screen>
+      <div class="join-hero">
+        <div class="logo-mark">🙈</div>
+        <h1 class="logo-title">Pergunta<br/>Boba</h1>
+      </div>
+      <div class="card join-card">
+        <input id="input-name" class="text-input" type="text" maxlength="18" placeholder="Seu nome" autocomplete="off" />
+        <div class="swatch-row" id="swatch-row"></div>
+        <button id="btn-join" class="btn btn-primary btn-big">Entrar na sala</button>
+      </div>
+    </section>
+
+    <!-- TELA: lobby -->
+    <section class="screen" id="screen-lobby" data-screen hidden>
+      <div class="lobby-head">
+        <div class="pulse-dot"></div>
+        <p class="eyebrow" id="lobby-count-label">esperando jogadores</p>
+      </div>
+      <div class="players-grid" id="lobby-players"></div>
+      <button id="btn-start" class="btn btn-primary btn-big btn-floating" disabled>Iniciar jogo</button>
+    </section>
+
+    <!-- TELA: escolher categoria (palpiteiro) -->
+    <section class="screen" id="screen-category" data-screen hidden>
+      <p class="eyebrow">escolha uma categoria</p>
+      <div class="category-grid" id="category-grid"></div>
+    </section>
+
+    <!-- TELA: aguardando categoria (outros) -->
+    <section class="screen screen-center" id="screen-wait-category" data-screen hidden>
+      <div class="waiting-avatar" id="wait-cat-avatar"></div>
+      <p class="wait-name" id="wait-cat-name">Alguém</p>
+      <p class="eyebrow">está escolhendo a categoria</p>
+      <div class="dots"><span></span><span></span><span></span></div>
+    </section>
+
+    <!-- TELA: pergunta revelada (não-palpiteiros) -->
+    <section class="screen screen-center" id="screen-listen-answer" data-screen hidden>
+      <div class="cat-chip" id="listen-cat-chip"></div>
+      <div class="question-card" id="listen-question"></div>
+      <p class="mic-caption">🗣️ responda em voz alta</p>
+    </section>
+
+    <!-- TELA: palpiteiro aguardando respostas -->
+    <section class="screen screen-center" id="screen-listen-guesser" data-screen hidden>
+      <div class="cat-chip" id="guesser-cat-chip"></div>
+      <div class="ear-pulse">👂</div>
+      <button id="btn-ready" class="btn btn-primary btn-big">Já ouvi todo mundo</button>
+    </section>
+
+    <!-- TELA: aguardando o palpiteiro decidir (outros, durante guess) -->
+    <section class="screen screen-center" id="screen-wait-guess" data-screen hidden>
+      <div class="cat-chip" id="waitguess-cat-chip"></div>
+      <div class="think-pulse">🤔</div>
+      <p class="eyebrow" id="waitguess-name">pensando...</p>
+    </section>
+
+    <!-- TELA: régua de adivinhação (palpiteiro) -->
+    <section class="screen" id="screen-guess" data-screen hidden>
+      <p class="eyebrow ruler-hint-top">menos provável ⟷ mais provável</p>
+      <div class="chips-pool" id="chips-pool"></div>
+      <div class="ruler" id="ruler"></div>
+      <button id="btn-confirm-order" class="btn btn-primary btn-big btn-floating" disabled>Confirmar ordem</button>
+    </section>
+
+    <!-- TELA: revelação -->
+    <section class="screen" id="screen-reveal" data-screen hidden>
+      <div class="reveal-points" id="reveal-points"></div>
+      <div class="ruler ruler-reveal" id="ruler-reveal"></div>
+      <button id="btn-continue" class="btn btn-primary btn-big btn-floating">Continuar</button>
+    </section>
+
+    <!-- TELA: fim de jogo -->
+    <section class="screen" id="screen-gameover" data-screen hidden>
+      <div class="trophy">🏆</div>
+      <p class="eyebrow">placar final</p>
+      <div class="ranking-list" id="ranking-list"></div>
+      <button id="btn-play-again" class="btn btn-primary btn-big btn-floating">Jogar de novo</button>
+    </section>
+
+  </main>
+
+  <!-- toast de reconexão -->
+  <div class="toast" id="toast" hidden></div>
+
+  <!-- MODAL: reset -->
+  <div class="modal-overlay" id="modal-reset" hidden>
+    <div class="modal-card">
+      <div class="modal-icon">⟲</div>
+      <p class="modal-title">Reiniciar a sala?</p>
+      <p class="modal-sub">A partida atual será encerrada para todo mundo.</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btn-reset-cancel">Cancelar</button>
+        <button class="btn btn-danger" id="btn-reset-confirm">Reiniciar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: configurações -->
+  <div class="modal-overlay" id="modal-settings" hidden>
+    <div class="modal-card">
+      <p class="modal-title">Configurações</p>
+      <p class="modal-label">Cor de destaque</p>
+      <div class="swatch-row" id="settings-swatch-row"></div>
+      <label class="toggle-row">
+        <span>Reduzir movimento</span>
+        <input type="checkbox" id="toggle-reduce-motion" />
+        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      </label>
+      <button class="btn btn-primary" id="btn-settings-close">Fechar</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

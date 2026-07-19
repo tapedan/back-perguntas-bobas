@@ -1,73 +1,70 @@
-# Pergunta Boba — jogo pra jogar com os amigos
+# Pergunta Boba 🙈
 
-Jogo multiplayer de dedução: um jogador (o "palpiteiro") escolhe uma categoria, os demais
-respondem em voz alta uma pergunta que ele não vê, e ele precisa adivinhar qual era a pergunta
-ordenando 5 opções numa régua de 0 a 4. Cada jogador usa o próprio celular.
+Jogo de dedução social multiplayer, mobile-first, para jogar com amigos no
+mesmo lugar — cada um no seu celular, todos numa única sala global (sem
+código de sala).
 
-- `backend/` — servidor Node + Express + Socket.io (estado das salas, rodadas, pontuação, banco
-  de 500 perguntas).
-- `frontend/` — app React + Vite, mobile-first, com animações e transições entre as telas.
+## Como rodar
 
-## Rodando localmente
+Requer [Node.js](https://nodejs.org) 18+.
 
-### Backend
 ```bash
-cd backend
+cd server
 npm install
 npm start
 ```
-Sobe em `http://localhost:3001`.
 
-### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
+O servidor sobe em `http://localhost:3001` e já serve o cliente (pasta
+`client/`) — não precisa de build separado.
+
+## Para jogar com amigos no mesmo lugar
+
+1. Descubra o IP local da máquina que vai rodar o servidor (ex.: `192.168.0.15`).
+2. Todos os celulares precisam estar na **mesma rede Wi-Fi**.
+3. Cada pessoa abre `http://SEU-IP:3001` no navegador do celular.
+4. Todo mundo que abrir o link cai automaticamente na mesma sala — sem
+   código, sem convite.
+
+> Dica: para jogar em rede pública / internet, hospede o servidor em algum
+> provedor (Render, Railway, Fly.io etc.) e compartilhe a URL pública.
+
+## Regras rápidas
+
+- 3 a 12 jogadores. Todo mundo passa pelo papel de **palpiteiro** uma vez,
+  em rodadas alternadas.
+- O palpiteiro escolhe 1 de 5 categorias.
+- Os outros jogadores veem a pergunta oficial na tela e respondem **em voz
+  alta** — o palpiteiro não vê a pergunta.
+- O palpiteiro recebe 5 perguntas embaralhadas (1 oficial + 4 distratoras)
+  e as posiciona numa régua de 0 (menos provável) a 4 (mais provável) de
+  ser a oficial, com base só no que ouviu.
+- Pontuação = posição em que a pergunta oficial foi colocada.
+- No fim, ranking geral por pontos.
+
+## Estrutura do projeto
+
 ```
-Sobe em `http://localhost:5173` e já aponta para `http://localhost:3001` por padrão.
-Para testar em outros celulares na mesma rede Wi-Fi, acesse pelo IP da sua máquina
-(ex: `http://192.168.0.10:5173`) — o Vite já escuta em todas as interfaces (`host: true`).
+server/
+  index.js        servidor Express + Socket.io, estado da sala em memória
+  questions.json  banco de perguntas por categoria
+  package.json
+client/
+  index.html      todas as telas do jogo
+  style.css       tema escuro, motion design, componentes
+  app.js          lógica de estado, sockets, régua de arrastar/tocar
+```
 
-## Deploy no Render
+## Notas de implementação
 
-### 1) Backend (Web Service)
-1. Suba este repositório no seu GitHub privado.
-2. No Render, clique em **New > Web Service** e conecte o repositório.
-3. Configure:
-   - **Root Directory:** `backend`
-   - **Build Command:** `npm install`
-   - **Start Command:** `npm start`
-   - **Instance Type:** Free está ok para jogar com os amigos.
-4. Anote a URL gerada, algo como `https://pergunta-boba-backend.onrender.com`.
-
-> O plano gratuito do Render "dorme" depois de um tempo sem uso — a primeira conexão de cada
-> partida pode demorar ~30s para acordar o servidor. Depois disso funciona normal.
-
-### 2) Frontend (Static Site)
-1. No Render, clique em **New > Static Site** e conecte o mesmo repositório.
-2. Configure:
-   - **Root Directory:** `frontend`
-   - **Build Command:** `npm install && npm run build`
-   - **Publish Directory:** `dist`
-3. Em **Environment Variables**, adicione:
-   - `VITE_BACKEND_URL` = a URL do backend do passo anterior (ex:
-     `https://pergunta-boba-backend.onrender.com`)
-4. Deploy. A URL do Static Site é o link que você manda para os amigos.
-
-## Como jogar
-1. Alguém cria a sala (recebe um código de 4 letras) e compartilha com o grupo.
-2. Cada jogador entra pelo próprio celular com nome + código (mínimo 3 jogadores).
-3. Quem criou a sala clica em "Começar partida".
-4. A cada rodada, um jogador diferente é o palpiteiro:
-   - Ele escolhe uma categoria.
-   - Os demais veem a pergunta oficial na tela e respondem **em voz alta** (não pelo app).
-   - O palpiteiro recebe 5 perguntas da categoria (uma delas é a oficial) e ordena da menos
-     provável (0) para a mais provável (4) usando as setas.
-   - Ao concluir, a pontuação é revelada: pontos = posição em que ele colocou a pergunta oficial.
-5. A partida tem o mesmo número de rodadas que de jogadores — todos passam pelo papel de
-   palpiteiro uma vez. Vence quem tiver mais pontos ao final.
-
-## Estrutura de perguntas
-As 500 perguntas ficam em `backend/data/questions.json`, geradas por
-`backend/generate-questions.js` (mantido no repo caso você queira gerar variações ou aumentar o
-banco — é só rodar `node generate-questions.js` de novo dentro de `backend/`).
+- **Sala única**: o servidor mantém um único objeto de sala em memória.
+  Qualquer conexão entra automaticamente nela.
+- **Reconexão**: cada jogador guarda um token no `localStorage`. Ao voltar
+  do segundo plano (ou cair a conexão), o app reconecta e reenvia esse
+  token — o servidor devolve o mesmo jogador (nome, cor, pontuação) à sala.
+- **Reset**: qualquer jogador pode reiniciar a sala a qualquer momento
+  (botão ⟲, com confirmação em modal). Isso encerra a partida atual e
+  zera os placares.
+- **Acessibilidade**: alternância "reduzir movimento" nas configurações
+  (⚙️), além de respeitar `prefers-reduced-motion` do sistema.
+- **Cor de destaque**: cada jogador escolhe sua cor localmente; ela também
+  é usada como cor do avatar visível para os outros.
