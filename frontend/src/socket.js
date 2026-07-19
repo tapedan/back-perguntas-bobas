@@ -1,12 +1,26 @@
 import { io } from 'socket.io-client';
 
-// Em produção, defina VITE_BACKEND_URL nas variáveis de ambiente do Render
-// apontando para a URL do backend (ex: https://dumb-questions-backend.onrender.com)
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://back-perguntas-bobas-tfnc.onrender.com';
+// URL do backend, fixa direto no código.
+const BACKEND_URL = 'https://back-perguntas-bobas-tfnc.onrender.com';
+
+// Log de diagnóstico — se isso não aparecer no console, o navegador está
+// rodando um bundle antigo (cache/deploy). Se aparecer, o problema está na
+// conexão em si (veja os logs de connect/connect_error logo abaixo).
+console.log('[socket.js] módulo carregado — BACKEND_URL =', BACKEND_URL);
 
 export const socket = io(BACKEND_URL, {
   autoConnect: true,
   transports: ['websocket', 'polling'],
+});
+
+socket.on('connect', () => {
+  console.log('[socket] conectado ao backend:', BACKEND_URL, '— id:', socket.id);
+});
+socket.on('connect_error', (err) => {
+  console.error('[socket] falha ao conectar em', BACKEND_URL, '—', err.message);
+});
+socket.on('disconnect', (reason) => {
+  console.warn('[socket] desconectado:', reason);
 });
 
 export function getOrCreatePlayerId() {
