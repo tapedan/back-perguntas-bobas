@@ -1,31 +1,21 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { getAvatarColor } from '../socket.js';
 
 const DOT_COLORS = ['#f5a623', '#ff5d8f', '#4cd9c0', '#7dc2ff', '#ffb15e', '#c792ea'];
 
-export default function Lobby({ code, players, onStart, error, myId }) {
-  const [copied, setCopied] = useState(false);
+export default function Lobby({ players, onStart, onLeave, error, myId }) {
   const minPlayers = 3;
   const canStart = players.length >= minPlayers;
-
-  function copyCode() {
-    navigator.clipboard?.writeText(code).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  }
+  const missing = Math.max(0, minPlayers - players.length);
 
   return (
     <div className="screen">
-      <p className="eyebrow">sala de espera</p>
+      <p className="eyebrow">sala global</p>
       <h2 style={{ fontSize: 26, marginTop: 6 }}>Chama a turma</h2>
-      <p className="subtitle">Compartilhe o código para os amigos entrarem pelo próprio celular.</p>
-
-      <div className="card" style={{ marginTop: 18 }}>
-        <div className="room-code-badge">{code}</div>
-        <button className="btn btn-ghost btn-block" onClick={copyCode}>
-          {copied ? 'Copiado!' : 'Copiar código'}
-        </button>
-      </div>
+      <p className="subtitle">
+        Todo mundo que abrir o app cai automaticamente aqui — não precisa de código. Espere a
+        galera entrar pelo próprio celular.
+      </p>
 
       <div className="stack" style={{ marginTop: 22 }}>
         <div className="row-between">
@@ -33,14 +23,17 @@ export default function Lobby({ code, players, onStart, error, myId }) {
             Jogadores ({players.length})
           </span>
           {!canStart && (
-            <span style={{ fontSize: 12.5, color: 'var(--text-faint)', fontWeight: 700 }}>
-              mínimo {minPlayers}
+            <span className="pill-hint">
+              faltam {missing} para começar
             </span>
           )}
         </div>
         {players.map((p, i) => (
           <div className="player-pill" key={p.id}>
-            <div className="avatar-dot" style={{ background: DOT_COLORS[i % DOT_COLORS.length] }}>
+            <div
+              className="avatar-dot"
+              style={{ background: p.id === myId ? getAvatarColor() : DOT_COLORS[i % DOT_COLORS.length] }}
+            >
               {p.name.charAt(0).toUpperCase()}
             </div>
             <span style={{ fontWeight: 700 }}>
@@ -50,17 +43,25 @@ export default function Lobby({ code, players, onStart, error, myId }) {
             <div className={`presence-dot ${p.connected ? '' : 'offline'}`} />
           </div>
         ))}
+        {players.length === 0 && (
+          <p className="subtitle">Ninguém entrou ainda. Compartilhe o link do jogo com a galera!</p>
+        )}
       </div>
 
       {error && <div className="error-banner" style={{ marginTop: 16 }}>{error}</div>}
 
-      <button
-        className="btn btn-primary btn-block btn-fixed-bottom"
-        disabled={!canStart}
-        onClick={onStart}
-      >
-        {canStart ? 'Começar partida' : `Esperando mais jogadores...`}
-      </button>
+      <div className="stack btn-fixed-bottom">
+        <button
+          className="btn btn-primary btn-block"
+          disabled={!canStart}
+          onClick={onStart}
+        >
+          {canStart ? 'Começar partida' : 'Esperando mais jogadores...'}
+        </button>
+        <button className="link-btn" onClick={onLeave}>
+          Voltar ao menu
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { vibrate } from '../haptics.js';
 
 const CATEGORY_META = {
   objetos: { label: 'Objetos', emoji: '🎒' },
@@ -13,6 +14,7 @@ export default function CategoryPicker({ round, onChoose }) {
 
   function handlePick(cat) {
     if (picked) return;
+    vibrate(12);
     setPicked(cat);
     onChoose(cat);
   }

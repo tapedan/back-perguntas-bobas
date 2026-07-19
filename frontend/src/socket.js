@@ -34,3 +34,35 @@ export function getSavedSession() {
 export function clearSession() {
   localStorage.removeItem('dq_room_code');
 }
+
+// ---------- Perfil (nome + cor do avatar) ----------
+
+export function getAvatarColor() {
+  return localStorage.getItem('dq_avatar_color') || '#f5a623';
+}
+
+export function saveAvatarColor(color) {
+  localStorage.setItem('dq_avatar_color', color);
+}
+
+// ---------- Predefinições (movimento, vibração, tema) ----------
+
+const DEFAULT_PREFERENCES = {
+  reduceMotion: false,
+  haptics: true,
+  accent: 'amber',
+};
+
+export function getPreferences() {
+  try {
+    const raw = localStorage.getItem('dq_preferences');
+    if (!raw) return { ...DEFAULT_PREFERENCES };
+    return { ...DEFAULT_PREFERENCES, ...JSON.parse(raw) };
+  } catch {
+    return { ...DEFAULT_PREFERENCES };
+  }
+}
+
+export function savePreferences(prefs) {
+  localStorage.setItem('dq_preferences', JSON.stringify(prefs));
+}

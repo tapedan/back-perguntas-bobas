@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
+import { vibrate } from '../haptics.js';
 
 const CATEGORY_LABEL = {
   objetos: 'Objetos',
@@ -45,6 +46,7 @@ export default function GuesserScale({ round, questions, onSubmit }) {
   function move(index, direction) {
     const targetIndex = index + direction;
     if (targetIndex < 0 || targetIndex >= order.length) return;
+    vibrate(8);
     captureFirstRects();
     setOrder((prev) => {
       const copy = [...prev];
@@ -55,6 +57,7 @@ export default function GuesserScale({ round, questions, onSubmit }) {
 
   function handleSubmit() {
     if (submitted) return;
+    vibrate(20);
     setSubmitted(true);
     onSubmit(order.map((q) => q.id));
   }

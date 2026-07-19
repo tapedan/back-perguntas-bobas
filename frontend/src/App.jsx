@@ -1,6 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { socket, getOrCreatePlayerId, saveSession, getSavedSession, clearSession } from './socket.js';
-import Join from './screens/Join.jsx';
+import {
+  socket,
+  getOrCreatePlayerId,
+  saveSession,
+  getSavedSession,
+  getPreferences,
+} from './socket.js';
+import AnimatedBackground from './components/AnimatedBackground.jsx';
+import ResetButton from './components/ResetButton.jsx';
+import Menu from './screens/Menu.jsx';
 import Lobby from './screens/Lobby.jsx';
 import CategoryPicker from './screens/CategoryPicker.jsx';
 import WaitingScreen from './screens/WaitingScreen.jsx';
@@ -11,18 +19,48 @@ import GameOver from './screens/GameOver.jsx';
 
 const playerId = getOrCreatePlayerId();
 
+const ACCENT_HEX = {
+  amber: '#f5a623',
+  coral: '#ff5d8f',
+  mint: '#4cd9c0',
+  blue: '#7dc2ff',
+  violet: '#c792ea',
+};
+
+function applyPreferences(prefs) {
+  document.documentElement.style.setProperty('--accent', ACCENT_HEX[prefs.accent] || ACCENT_HEX.amber);
+  document.documentElement.classList.toggle('reduce-motion', !!prefs.reduceMotion);
+}
+
 export default function App() {
-  const [status, setStatus] = useState('join'); // join | lobby | playing | round_result | finished
-  const [code, setCode] = useState('');
-  const [name, setName] = useState('');
+  // 'menu' = tela inicial (jogar / perfil / predefinições)
+  // 'lobby' | 'playing' | 'round_result' | 'finished' = dentro da sala global
+  const [status, setStatus] = useState('menu');
+  const [name, setName] = useState(() => getSavedSession().name || '');
   const [players, setPlayers] = useState([]);
-  const [round, setRound] = useState(null); // {guesserId, guesserName, roundNumber, totalRounds, category}
+  const [round, setRound] = useState(null);
   const [guesserQuestions, setGuesserQuestions] = useState(null);
   const [playerQuestion, setPlayerQuestion] = useState(null);
   const [roundResult, setRoundResult] = useState(null);
   const [finalScoreboard, setFinalScoreboard] = useState(null);
   const [error, setError] = useState('');
+  const [entering, setEntering] = useState(false);
+  const [resetNotice, setResetNotice] = useState(false);
   const attemptedRejoin = useRef(false);
+
+  // Aplica cor de destaque e preferência de movimento salvas assim que o app abre.
+  useEffect(() => {
+    applyPreferences(getPreferences());
+  }, []);
+
+  function resetLocalGameState() {
+    setPlayers([]);
+    setRound(null);
+    setGuesserQuestions(null);
+    setPlayerQuestion(null);
+    setRoundResult(null);
+    setFinalScoreboard(null);
+  }
 
   useEffect(() => {
     function onRoomUpdate(summary) {
@@ -57,6 +95,13 @@ export default function App() {
       setStatus('finished');
       setFinalScoreboard(finalPlayers);
     }
+    // Alguém apertou o botão global de reset: todo mundo volta pro menu.
+    function onServerReset() {
+      resetLocalGameState();
+      setStatus('menu');
+      setResetNotice(true);
+      setTimeout(() => setResetNotice(false), 4000);
+    }
 
     socket.on('room_update', onRoomUpdate);
     socket.on('game_started', onGameStarted);
@@ -66,6 +111,7 @@ export default function App() {
     socket.on('player_question', onPlayerQuestion);
     socket.on('round_result', onRoundResult);
     socket.on('game_over', onGameOver);
+    socket.on('server_reset', onServerReset);
 
     return () => {
       socket.off('room_update', onRoomUpdate);
@@ -76,22 +122,19 @@ export default function App() {
       socket.off('player_question', onPlayerQuestion);
       socket.off('round_result', onRoundResult);
       socket.off('game_over', onGameOver);
+      socket.off('server_reset', onServerReset);
     };
   }, []);
 
-  // Tenta reconectar automaticamente a uma sala salva (ex: app foi pra segundo plano)
+  // Tenta reconectar automaticamente à sala global (ex: app foi pra segundo plano).
   useEffect(() => {
     if (attemptedRejoin.current) return;
     attemptedRejoin.current = true;
     const saved = getSavedSession();
-    if (!saved.code) return;
-    setName(saved.name);
-    socket.emit('rejoin_room', { code: saved.code, playerId }, (res) => {
-      if (!res || !res.ok) {
-        clearSession();
-        return;
-      }
-      setCode(res.room.code);
+    if (!saved.name) return;
+    socket.emit('rejoin_room', { playerId }, (res) => {
+      if (!res || !res.ok) return;
+      setName(saved.name);
       setPlayers(res.room.players);
       setStatus(res.room.status === 'lobby' ? 'lobby' : res.room.status);
       if (res.round) setRound({ ...res.round, category: res.round.category });
@@ -102,99 +145,109 @@ export default function App() {
     });
   }, []);
 
-  function handleCreateRoom(playerName) {
+  function handlePlay(playerName) {
     setError('');
-    socket.emit('create_room', { name: playerName, playerId }, (res) => {
-      if (!res.ok) return setError(res.error || 'Não foi possível criar a sala.');
+    setEntering(true);
+    socket.emit('enter_lobby', { name: playerName, playerId }, (res) => {
+      setEntering(false);
+      if (!res.ok) return setError(res.error || 'Não foi possível entrar na sala.');
       setName(playerName);
-      setCode(res.code);
-      saveSession({ code: res.code, name: playerName });
-      setStatus('lobby');
+      saveSession({ name: playerName });
+      setStatus(res.status === 'lobby' ? 'lobby' : res.status);
     });
   }
 
-  function handleJoinRoom(playerName, roomCode) {
-    setError('');
-    socket.emit('join_room', { name: playerName, code: roomCode, playerId }, (res) => {
-      if (!res.ok) return setError(res.error || 'Não foi possível entrar na sala.');
-      setName(playerName);
-      setCode(res.code);
-      saveSession({ code: res.code, name: playerName });
-      setStatus('lobby');
-    });
+  function handleLeaveToMenu() {
+    setStatus('menu');
   }
 
   function handleStartGame() {
     setError('');
-    socket.emit('start_game', { code }, (res) => {
+    socket.emit('start_game', {}, (res) => {
       if (res && !res.ok) setError(res.error || 'Não foi possível iniciar.');
     });
   }
 
   function handleChooseCategory(category) {
-    socket.emit('choose_category', { code, category }, (res) => {
+    socket.emit('choose_category', { category }, (res) => {
       if (res && !res.ok) setError(res.error || 'Erro ao escolher categoria.');
     });
   }
 
   function handleSubmitArrangement(arrangementIds) {
-    socket.emit('submit_arrangement', { code, arrangement: arrangementIds }, (res) => {
+    socket.emit('submit_arrangement', { arrangement: arrangementIds }, (res) => {
       if (res && !res.ok) setError(res.error || 'Erro ao enviar.');
     });
   }
 
   function handleNextRound() {
-    socket.emit('next_round', { code }, () => {});
+    socket.emit('next_round', {}, () => {});
   }
 
   function handlePlayAgain() {
-    clearSession();
-    window.location.reload();
+    setStatus('menu');
   }
 
   const isGuesser = round && round.guesserId === playerId;
 
   return (
-    <div className="app-shell">
-      {status === 'join' && (
-        <Join onCreate={handleCreateRoom} onJoin={handleJoinRoom} error={error} />
-      )}
+    <>
+      <AnimatedBackground />
+      <div className="app-shell">
+        {resetNotice && (
+          <div className="toast-banner">O servidor foi resetado — todo mundo voltou pro menu.</div>
+        )}
 
-      {status === 'lobby' && (
-        <Lobby code={code} players={players} onStart={handleStartGame} error={error} myId={playerId} />
-      )}
+        {status === 'menu' && (
+          <Menu
+            name={name}
+            setName={setName}
+            onPlay={handlePlay}
+            error={error}
+            busy={entering}
+            onPreferencesChange={applyPreferences}
+          />
+        )}
 
-      {status === 'playing' && round && !round.category && isGuesser && (
-        <CategoryPicker round={round} onChoose={handleChooseCategory} />
-      )}
+        {status === 'lobby' && (
+          <Lobby
+            players={players}
+            onStart={handleStartGame}
+            onLeave={handleLeaveToMenu}
+            error={error}
+            myId={playerId}
+          />
+        )}
 
-      {status === 'playing' && round && !round.category && !isGuesser && (
-        <WaitingScreen
-          title={`${round.guesserName} está escolhendo a categoria...`}
-          subtitle="Prepare os ouvidos — a pergunta chega já já."
-          round={round}
-        />
-      )}
+        {status === 'playing' && round && !round.category && isGuesser && (
+          <CategoryPicker round={round} onChoose={handleChooseCategory} />
+        )}
 
-      {status === 'playing' && round && round.category && isGuesser && guesserQuestions && (
-        <GuesserScale round={round} questions={guesserQuestions} onSubmit={handleSubmitArrangement} />
-      )}
+        {status === 'playing' && round && !round.category && !isGuesser && (
+          <WaitingScreen
+            title={`${round.guesserName} está escolhendo a categoria...`}
+            subtitle="Prepare os ouvidos — a pergunta chega já já."
+            round={round}
+          />
+        )}
 
-      {status === 'playing' && round && round.category && !isGuesser && playerQuestion && (
-        <PlayerQuestion round={round} data={playerQuestion} />
-      )}
+        {status === 'playing' && round && round.category && isGuesser && guesserQuestions && (
+          <GuesserScale round={round} questions={guesserQuestions} onSubmit={handleSubmitArrangement} />
+        )}
 
-      {status === 'round_result' && roundResult && (
-        <RoundResult
-          data={roundResult}
-          myId={playerId}
-          onNext={handleNextRound}
-        />
-      )}
+        {status === 'playing' && round && round.category && !isGuesser && playerQuestion && (
+          <PlayerQuestion round={round} data={playerQuestion} />
+        )}
 
-      {status === 'finished' && finalScoreboard && (
-        <GameOver players={finalScoreboard} myId={playerId} onPlayAgain={handlePlayAgain} />
-      )}
-    </div>
+        {status === 'round_result' && roundResult && (
+          <RoundResult data={roundResult} myId={playerId} onNext={handleNextRound} />
+        )}
+
+        {status === 'finished' && finalScoreboard && (
+          <GameOver players={finalScoreboard} myId={playerId} onPlayAgain={handlePlayAgain} />
+        )}
+      </div>
+      <ResetButton />
+    </>
   );
 }
