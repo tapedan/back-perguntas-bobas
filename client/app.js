@@ -132,6 +132,19 @@
   socket.on('disconnect', () => { if (joined) showToast('Reconectando…'); });
   socket.io.on('reconnect', () => { if (myName) doJoin(); });
 
+  socket.on('force_rejoin', () => {
+    token = '';
+    myName = '';
+    localStorage.removeItem('pb_token');
+    localStorage.removeItem('pb_name');
+    joined = false;
+    myToken = null;
+    $('#input-name').value = '';
+    $('#round-indicator').hidden = true;
+    document.querySelectorAll('.modal-overlay').forEach((m) => (m.hidden = true));
+    showScreen('screen-join');
+  });
+
   // ---------------- render principal ----------------
   function render(view) {
     if (!joined && !myName) {

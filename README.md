@@ -1,8 +1,21 @@
-# Pergunta Boba 🙈
+# Pergunta Boba 🙈 — v2
 
 Jogo de dedução social multiplayer, mobile-first, para jogar com amigos no
 mesmo lugar — cada um no seu celular, todos numa única sala global (sem
 código de sala).
+
+### Novidades desta versão
+- **Sala de espera** com avatar colorido, nome e uma tag "você" para
+  identificar seu próprio jogador entre os outros.
+- **Pergunta sempre visível** para quem não é o palpiteiro — tanto durante
+  a fase de ouvir quanto durante a fase em que o palpiteiro está ordenando
+  — com um botão de olho 👁️ para ocultar/revelar o texto a qualquer momento.
+- **Régua do palpiteiro redesenhada**: sem campos vazios acima/abaixo — a
+  lista já é a régua. Cada pergunta só sobe ou desce com os botões ▲▼,
+  com animação fluida (FLIP) a cada movimento.
+- **Visual aprimorado**: cartões em glassmorphism, barra de gradiente ao
+  lado da régua indicando a escala de probabilidade, tipografia e espaçamento
+  mais consistentes, hierarquia mais clara em todas as telas.
 
 ## Como rodar
 

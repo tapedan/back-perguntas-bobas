@@ -277,11 +277,8 @@ io.on('connection', (socket) => {
 
   socket.on('reset_room', () => {
     room = freshRoom();
-    for (const p of players.values()) {
-      p.score = 0;
-      p.spectator = false;
-    }
-    broadcastState();
+    players.clear();
+    io.emit('force_rejoin');
   });
 
   socket.on('disconnect', () => {
