@@ -2,7 +2,7 @@ import { io } from 'socket.io-client';
 
 // Em produção, defina VITE_BACKEND_URL nas variáveis de ambiente do Render
 // apontando para a URL do backend (ex: https://dumb-questions-backend.onrender.com)
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://back-perguntas-bobas-tfnc.onrender.com';
 
 export const socket = io(BACKEND_URL, {
   autoConnect: true,
