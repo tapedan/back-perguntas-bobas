@@ -17,12 +17,14 @@
     <div class="blob b1"></div>
     <div class="blob b2"></div>
     <div class="blob b3"></div>
+    <div class="grain"></div>
   </div>
 
   <!-- barra superior fixa -->
   <header class="topbar">
     <button id="btn-settings" class="icon-btn" aria-label="Configurações">⚙️</button>
     <div class="topbar-center" id="round-indicator" hidden>
+      <span class="round-tag">rodada</span>
       <span id="round-current">1</span><span class="round-sep">/</span><span id="round-total">1</span>
     </div>
     <button id="btn-reset" class="icon-btn" aria-label="Reiniciar sala">⟲</button>
@@ -35,8 +37,9 @@
       <div class="join-hero">
         <div class="logo-mark">🙈</div>
         <h1 class="logo-title">Pergunta<br/>Boba</h1>
+        <p class="logo-sub">dedução social · mesma sala, mesma sala de estar</p>
       </div>
-      <div class="card join-card">
+      <div class="card glass join-card">
         <input id="input-name" class="text-input" type="text" maxlength="18" placeholder="Seu nome" autocomplete="off" />
         <div class="swatch-row" id="swatch-row"></div>
         <button id="btn-join" class="btn btn-primary btn-big">Entrar na sala</button>
@@ -67,39 +70,48 @@
       <div class="dots"><span></span><span></span><span></span></div>
     </section>
 
-    <!-- TELA: pergunta revelada (não-palpiteiros) -->
-    <section class="screen screen-center" id="screen-listen-answer" data-screen hidden>
-      <div class="cat-chip" id="listen-cat-chip"></div>
-      <div class="question-card" id="listen-question"></div>
-      <p class="mic-caption">🗣️ responda em voz alta</p>
+    <!-- TELA: pergunta visível para todos (exceto palpiteiro), com opção de ocultar -->
+    <section class="screen screen-center" id="screen-answer-view" data-screen hidden>
+      <div class="cat-chip" id="answer-cat-chip"></div>
+      <div class="question-wrap">
+        <div class="question-card glass" id="answer-question">
+          <span class="q-text" id="answer-question-text"></span>
+        </div>
+        <button id="btn-toggle-hide" class="eye-btn" aria-label="Ocultar pergunta">🙈</button>
+      </div>
+      <div class="answer-caption" id="answer-caption">
+        <span class="caption-icon" id="answer-caption-icon">🗣️</span>
+        <span id="answer-caption-text">responda em voz alta</span>
+      </div>
     </section>
 
     <!-- TELA: palpiteiro aguardando respostas -->
     <section class="screen screen-center" id="screen-listen-guesser" data-screen hidden>
       <div class="cat-chip" id="guesser-cat-chip"></div>
       <div class="ear-pulse">👂</div>
+      <p class="eyebrow">ouvindo as respostas</p>
       <button id="btn-ready" class="btn btn-primary btn-big">Já ouvi todo mundo</button>
     </section>
 
-    <!-- TELA: aguardando o palpiteiro decidir (outros, durante guess) -->
-    <section class="screen screen-center" id="screen-wait-guess" data-screen hidden>
-      <div class="cat-chip" id="waitguess-cat-chip"></div>
-      <div class="think-pulse">🤔</div>
-      <p class="eyebrow" id="waitguess-name">pensando...</p>
-    </section>
-
-    <!-- TELA: régua de adivinhação (palpiteiro) -->
+    <!-- TELA: régua de adivinhação (palpiteiro) — reordenar subindo/descendo -->
     <section class="screen" id="screen-guess" data-screen hidden>
-      <p class="eyebrow ruler-hint-top">menos provável ⟷ mais provável</p>
-      <div class="chips-pool" id="chips-pool"></div>
-      <div class="ruler" id="ruler"></div>
-      <button id="btn-confirm-order" class="btn btn-primary btn-big btn-floating" disabled>Confirmar ordem</button>
+      <div class="cat-chip cat-chip-sm" id="guess-cat-chip"></div>
+      <p class="scale-label scale-label-top">menos provável</p>
+      <div class="reorder-shell">
+        <div class="scale-bar" aria-hidden="true"></div>
+        <div class="reorder-list" id="reorder-list"></div>
+      </div>
+      <p class="scale-label scale-label-bottom">mais provável</p>
+      <button id="btn-confirm-order" class="btn btn-primary btn-big btn-floating">Confirmar ordem</button>
     </section>
 
     <!-- TELA: revelação -->
     <section class="screen" id="screen-reveal" data-screen hidden>
       <div class="reveal-points" id="reveal-points"></div>
-      <div class="ruler ruler-reveal" id="ruler-reveal"></div>
+      <div class="reorder-shell reorder-shell-static">
+        <div class="scale-bar" aria-hidden="true"></div>
+        <div class="reorder-list reveal-list" id="reveal-list"></div>
+      </div>
       <button id="btn-continue" class="btn btn-primary btn-big btn-floating">Continuar</button>
     </section>
 
